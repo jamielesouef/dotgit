@@ -394,6 +394,31 @@ extension RepositoriesServiceTests {
         #expect(harness.repositories.repositories.first?.status == .failed)
     }
 
+    @Test("re-reads a synced repository so the list stops showing changes that were just pushed")
+    @MainActor
+    func rereadsAfterSync() async {
+        let harness = ServiceHarness()
+        let directory = await harness.addRepository(
+            "a",
+            name: "app",
+            snapshot: RepositoryFixtures.snapshot(tracked: [GitFileChange(path: "a.swift", status: .modified)])
+        )
+        await harness.repositories.start()
+        await harness.gitClient.setSnapshot(RepositoryFixtures.snapshot(), at: directory)
+
+        await harness.repositories.apply([
+            RepositorySyncOutcome(
+                identifier: "a",
+                result: .succeeded(commit: "abc123", branch: "main"),
+                finishedAt: Date(timeIntervalSince1970: 500)
+            )
+        ])
+
+        let repository = harness.repositories.repositories.first
+        #expect(repository?.snapshot?.workingTree.isClean == true)
+        #expect(repository?.shared.handoff?.commit == "abc123")
+    }
+
     // MARK: - Readiness
 
     @Test("stores the readiness report against the repository it describes")

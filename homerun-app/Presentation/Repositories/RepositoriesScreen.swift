@@ -72,7 +72,13 @@ struct RepositoriesScreen: View {
 
                 Button(String(localized: "Scan a folder"), systemImage: "magnifyingglass", action: scanFolder)
 
-                Button(String(localized: "Sync selected"), systemImage: "arrow.triangle.2.circlepath") {
+                Button(String(localized: "Refresh"), systemImage: "arrow.triangle.2.circlepath") {
+                    Task {
+                        await repositories.refresh()
+                    }
+                }
+
+                Button(String(localized: "Sync selected"), systemImage: "icloud.and.arrow.up") {
                     Task {
                         await sync.review(identifiers: selection.isEmpty ? nil : selection)
                     }

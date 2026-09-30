@@ -26,7 +26,7 @@ struct TodayScreen: View {
                         isShowingResume = true
                     }
 
-                    Button(String(localized: "Review and sync all"), systemImage: "arrow.triangle.2.circlepath") {
+                    Button(String(localized: "Review and sync all"), systemImage: "icloud.and.arrow.up") {
                         Task {
                             await sync.review(identifiers: nil)
                         }
