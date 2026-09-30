@@ -297,7 +297,7 @@ final class RepositoriesService: SingleFlightRefreshing {
             record(outcome)
         }
 
-        await refresh()
+        await reread(identifiers: Set(outcomes.map(\.identifier)))
     }
 
     // MARK: - Detail
@@ -451,6 +451,30 @@ private extension RepositoriesService {
             }
             guard let index = repositories.firstIndex(where: { $0.id == entry.shared.identifier }) else {
                 repositories.append(loaded)
+                continue
+            }
+
+            repositories[index] = loaded
+        }
+    }
+
+    /// Re-reads only the repositories a sync touched, in place. A full `refresh()` here
+    /// re-snapshots everything and is cancelled by any other refresh, which left the
+    /// list showing the changes that had just been committed and pushed.
+    func reread(identifiers: Set<String>) async {
+        let touched = repositories.filter { repository in
+            repository.allCheckouts.contains { identifiers.contains($0.id) }
+        }
+
+        for repository in touched {
+            let shared = (try? sharedStore.repository(identifier: repository.id)) ?? repository.shared
+            let path = settings.localSettings.repositoryPaths[repository.id]
+            let loaded = await tracked(shared, path: path)
+
+            guard Task.isCancelled == false else {
+                return
+            }
+            guard let index = repositories.firstIndex(where: { $0.id == repository.id }) else {
                 continue
             }
 
