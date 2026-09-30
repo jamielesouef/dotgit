@@ -4,7 +4,8 @@ struct LaunchView: View {
     // MARK: - Constants
 
     private enum Constants {
-        static let logoSize: CGFloat = 72
+        static let heroMaxWidth: CGFloat = 440
+        static let heroCornerRadius: CGFloat = 20
         static let checklistWidth: CGFloat = 380
     }
 
@@ -17,13 +18,12 @@ struct LaunchView: View {
     var body: some View {
         VStack(spacing: AppSpacing.large) {
             VStack(spacing: AppSpacing.regular) {
-                Image(systemName: "figure.baseball")
-                    .font(.system(size: Constants.logoSize))
-                    .foregroundStyle(.tint)
-                    .accessibilityHidden(true)
-
-                Text(String(localized: "homerun"))
-                    .font(.largeTitle.weight(.semibold))
+                Image(.launchHero)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: Constants.heroMaxWidth)
+                    .clipShape(.rect(cornerRadius: Constants.heroCornerRadius))
+                    .accessibilityLabel(String(localized: "homerun. Checked, committed, all good."))
 
                 Text(String(localized: "Checking the tools homerun uses on this Mac"))
                     .font(.callout)
@@ -53,6 +53,11 @@ struct LaunchView: View {
             ]
         )
         .frame(width: 900, height: 600)
+    }
+
+    #Preview("Short window") {
+        LaunchView(steps: StartupProgressUseCase.waitingSteps())
+            .frame(width: 600, height: 420)
     }
 
     #Preview("git missing") {
