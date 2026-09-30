@@ -185,7 +185,7 @@ final class RepositoriesService: SingleFlightRefreshing {
 
         for repository in RepositoryMaintenanceUseCase.deduplicated(discovered) {
             let remoteURL = try? await gitClient.remoteURL(at: repository.url)
-            let identifier = await identifier(remoteURL: remoteURL, folderName: repository.name)
+            let identifier = await sshHostResolver.identifier(remoteURL: remoteURL, folderName: repository.name)
             let merged = RepositoryMaintenanceUseCase.merged(
                 existing: existing.first { $0.identifier == identifier },
                 identifier: identifier,
@@ -384,47 +384,13 @@ final class RepositoriesService: SingleFlightRefreshing {
 
 private extension RepositoriesService {
     func load(_ shared: [WorkspaceRepository], paths: [String: String]) async -> [TrackedRepository] {
-        loadProgress = .starting(total: shared.count)
-
-        var loaded: [Int: TrackedRepository] = [:]
-
-        await withTaskGroup(of: (Int, TrackedRepository).self) { group in
-            var queue = shared.enumerated().makeIterator()
-
-            for _ in 0 ..< AppConstants.concurrentRepositoryReads {
-                startReading(next: &queue, in: &group, paths: paths)
-            }
-
-            for await (index, repository) in group {
-                guard Task.isCancelled == false else {
-                    group.cancelAll()
-                    return
-                }
-
-                loaded[index] = repository
-                loadProgress = loadProgress.finishedReading(repository.name)
-                startReading(next: &queue, in: &group, paths: paths)
-            }
-        }
-
-        return shared.indices.compactMap { loaded[$0] }
-    }
-
-    func startReading(
-        next queue: inout EnumeratedSequence<[WorkspaceRepository]>.Iterator,
-        in group: inout TaskGroup<(Int, TrackedRepository)>,
-        paths: [String: String]
-    ) {
-        guard let (index, repository) = queue.next() else {
-            return
-        }
-
-        let path = paths[repository.identifier]
-        let outcomes = outcomes
-        loadProgress = loadProgress.startingToRead(repository.name)
-
-        group.addTask { [reader] in
-            await (index, reader.read(repository, path: path, outcomes: outcomes))
+        await reader.readAll(
+            shared,
+            paths: paths,
+            outcomes: outcomes,
+            concurrency: AppConstants.concurrentRepositoryReads
+        ) { [weak self] progress in
+            self?.loadProgress = progress
         }
     }
 
@@ -446,7 +412,7 @@ private extension RepositoriesService {
         }
     }
 
-    func read(_ added: [(shared: WorkspaceRepository, directory: URL)]) async {
+    func read(_ added: [(shared: WorkspaceRepository, directory: URL)], appendsMissing: Bool = true) async {
         for entry in added {
             let loaded = await tracked(entry.shared, path: entry.directory.path(percentEncoded: false))
 
@@ -454,7 +420,9 @@ private extension RepositoriesService {
                 return
             }
             guard let index = repositories.firstIndex(where: { $0.id == entry.shared.identifier }) else {
-                repositories.append(loaded)
+                if appendsMissing {
+                    repositories.append(loaded)
+                }
                 continue
             }
 
@@ -463,40 +431,20 @@ private extension RepositoriesService {
     }
 
     /// Re-reads only the repositories a sync touched, in place. A full `refresh()` here
-    /// re-snapshots everything and is cancelled by any other refresh, which left the
-    /// list showing the changes that had just been committed and pushed.
+    /// is cancelled by any other refresh, leaving just-pushed changes on screen.
     func reread(identifiers: Set<String>) async {
-        let touched = repositories.filter { repository in
-            repository.allCheckouts.contains { identifiers.contains($0.id) }
-        }
-
-        for repository in touched {
-            let shared = (try? sharedStore.repository(identifier: repository.id)) ?? repository.shared
-            let path = settings.localSettings.repositoryPaths[repository.id]
-            let loaded = await tracked(shared, path: path)
-
-            guard Task.isCancelled == false else {
-                return
-            }
-            guard let index = repositories.firstIndex(where: { $0.id == repository.id }) else {
-                continue
+        let paths = settings.localSettings.repositoryPaths
+        let touched = repositories.compactMap { repository -> (shared: WorkspaceRepository, directory: URL)? in
+            guard repository.allCheckouts.contains(where: { identifiers.contains($0.id) }),
+                  let path = paths[repository.id]
+            else {
+                return nil
             }
 
-            repositories[index] = loaded
-        }
-    }
-
-    /// Keyed on the host an SSH alias resolves to, so switching a remote between
-    /// `github-work`, `github.com` and HTTPS does not track the same repository twice.
-    func identifier(remoteURL: String?, folderName: String) async -> String {
-        guard let alias = WorkspaceIdentifier.sshHost(in: remoteURL) else {
-            return WorkspaceIdentifier.make(remoteURL: remoteURL, folderName: folderName)
+            return ((try? sharedStore.repository(identifier: repository.id)) ?? repository.shared, URL(filePath: path))
         }
 
-        let hostName = await sshHostResolver.hostName(forAlias: alias)
-        let resolved = WorkspaceIdentifier.remote(remoteURL, resolvingSSHHostTo: hostName)
-
-        return WorkspaceIdentifier.make(remoteURL: resolved, folderName: folderName)
+        await read(touched, appendsMissing: false)
     }
 
     func tracked(_ repository: WorkspaceRepository, path: String?) async -> TrackedRepository {
@@ -504,17 +452,10 @@ private extension RepositoriesService {
     }
 
     func record(_ outcome: RepositorySyncOutcome) {
-        guard case let .succeeded(commit, branch) = outcome.result else {
+        guard let stored = try? sharedStore.repository(identifier: outcome.identifier),
+              let repository = SyncHandoffUseCase.recording(outcome, in: stored)
+        else {
             return
-        }
-        guard var repository = try? sharedStore.repository(identifier: outcome.identifier) else {
-            return
-        }
-
-        repository.lastSuccessfulSyncDate = outcome.finishedAt
-
-        if let commit, let branch {
-            repository.handoff = RepositoryHandoff(branch: branch, commit: commit, recordedAt: outcome.finishedAt)
         }
 
         store { () throws(PersistenceError) in
