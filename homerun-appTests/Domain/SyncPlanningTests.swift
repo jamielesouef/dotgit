@@ -247,17 +247,79 @@ struct SyncPlanUseCaseTests {
         #expect(planned.isActionable)
     }
 
-    @Test("lists other unsynced branches as outstanding without pushing them")
-    func listsOutstandingBranches() {
+    @Test("pushes other unpushed branches and leaves the ones behind their remote as a warning")
+    func pushesOtherUnpushedBranches() {
         let branches = [
             GitBranchRef(name: "feature/login", upstream: "origin/feature/login", aheadCount: 0, behindCount: 0),
-            GitBranchRef(name: "spike", upstream: nil, aheadCount: 0, behindCount: 0)
+            GitBranchRef(name: "spike", upstream: nil, aheadCount: 0, behindCount: 0),
+            GitBranchRef(name: "feature/ahead", upstream: "origin/feature/ahead", aheadCount: 2, behindCount: 0),
+            GitBranchRef(name: "feature/diverged", upstream: "origin/feature/diverged", aheadCount: 1, behindCount: 1)
         ]
         let repository = RepositoryFixtures.tracked(
             snapshot: RepositoryFixtures.snapshot(branch: "feature/login", ahead: 1, branches: branches)
         )
 
-        #expect(step(repository).outstandingBranches.map(\.name) == ["spike"])
+        let planned = step(repository)
+
+        #expect(planned.branchesToPush.map(\.name) == ["spike", "feature/ahead"])
+        #expect(planned.outstandingBranches.map(\.name) == ["feature/diverged"])
+        #expect(planned.newUpstreamBranches == ["spike"])
+    }
+
+    @Test("never pushes main from the side when main sync is turned off")
+    func skipsDisallowedOtherBranch() {
+        let repository = RepositoryFixtures.tracked(
+            snapshot: RepositoryFixtures.snapshot(
+                branch: "feature/login",
+                ahead: 1,
+                branches: [GitBranchRef(name: "main", upstream: "origin/main", aheadCount: 1, behindCount: 0)]
+            )
+        )
+
+        #expect(step(repository).branchesToPush.isEmpty)
+        #expect(step(repository).outstandingBranches.map(\.name) == ["main"])
+    }
+
+    @Test("has work to do when only another branch needs pushing")
+    func actionableForOtherBranchesOnly() {
+        let repository = RepositoryFixtures.tracked(
+            snapshot: RepositoryFixtures.snapshot(
+                branch: "feature/login",
+                branches: [GitBranchRef(name: "spike", upstream: nil, aheadCount: 0, behindCount: 0)],
+                upstream: "origin/feature/login"
+            )
+        )
+
+        #expect(step(repository).action == .commitAndPush(willCommit: false, setsUpstream: false))
+    }
+
+    @Test("counts the current branch as new on the remote when it has no upstream")
+    func currentBranchIsNewUpstream() {
+        let repository = RepositoryFixtures.tracked(
+            snapshot: RepositoryFixtures.snapshot(branch: "feature/login", upstream: nil)
+        )
+
+        #expect(step(repository).newUpstreamBranches == ["feature/login"])
+    }
+
+    @Test("keeps branches off the remote when creating upstreams is declined")
+    func declinedUpstreams() {
+        let repository = RepositoryFixtures.tracked(
+            snapshot: RepositoryFixtures.snapshot(
+                branch: "feature/login",
+                branches: [
+                    GitBranchRef(name: "spike", upstream: nil, aheadCount: 0, behindCount: 0),
+                    GitBranchRef(name: "feature/ahead", upstream: "origin/feature/ahead", aheadCount: 1, behindCount: 0)
+                ],
+                upstream: nil
+            )
+        )
+
+        let planned = SyncPlanUseCase.step(for: repository, includedUntrackedPaths: [], createsUpstreams: false)
+
+        #expect(planned.action == .blocked(.noUpstream))
+        #expect(planned.branchesToPush.map(\.name) == ["feature/ahead"])
+        #expect(planned.outstandingBranches.map(\.name) == ["spike"])
     }
 
     @Test("separates the actionable steps from the blocked ones")

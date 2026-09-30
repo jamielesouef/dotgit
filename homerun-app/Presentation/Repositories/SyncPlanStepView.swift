@@ -104,6 +104,24 @@ struct SyncPlanStepView: View {
 
     @ViewBuilder
     private var warnings: some View {
+        if step.isActionable, step.branchesToPush.isEmpty == false {
+            Label(
+                String(localized: "Also pushes: \(step.branchesToPush.map(\.name).joined(separator: ", "))"),
+                systemImage: "arrow.up.circle"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+
+        if step.isActionable, step.newUpstreamBranches.isEmpty == false {
+            Label(
+                String(localized: "New on the remote: \(step.newUpstreamBranches.joined(separator: ", "))"),
+                systemImage: "plus.circle"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+
         if step.outstandingBranches.isEmpty == false {
             Label(
                 String(
@@ -142,8 +160,22 @@ struct SyncPlanStepView: View {
                 ],
                 selectableUntrackedPaths: ["Notes.md", "Scratch.swift"],
                 includedUntrackedPaths: ["Notes.md"],
-                outstandingBranches: [GitBranchRef(name: "spike", upstream: nil, aheadCount: 0, behindCount: 0)],
-                submoduleChanges: [GitSubmoduleChange(path: "Vendor/Lib", kind: .commitDiffers)]
+                outstandingBranches: [GitBranchRef(
+                    name: "old-spike",
+                    upstream: "origin/old-spike",
+                    aheadCount: 2,
+                    behindCount: 1
+                )],
+                submoduleChanges: [GitSubmoduleChange(path: "Vendor/Lib", kind: .commitDiffers)],
+                branchesToPush: [
+                    GitBranchRef(name: "spike", upstream: nil, aheadCount: 0, behindCount: 0),
+                    GitBranchRef(
+                        name: "feature/settings",
+                        upstream: "origin/feature/settings",
+                        aheadCount: 3,
+                        behindCount: 0
+                    )
+                ]
             ),
             onUntrackedChange: { _, _ in },
             onSelectAllUntracked: { _ in }

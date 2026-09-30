@@ -29,6 +29,13 @@ struct SyncPlan: Equatable {
         hasUntrackedFiles && steps.filter(\.hasUntrackedFiles).allSatisfy(\.includesAllUntracked)
     }
 
+    /// Every branch the sync would create on the remote, as "repository: branch".
+    var newUpstreamBranches: [String] {
+        actionableSteps.flatMap { step in
+            step.newUpstreamBranches.map { "\(step.displayName): \($0)" }
+        }
+    }
+
     var isEmpty: Bool {
         actionableSteps.isEmpty
     }

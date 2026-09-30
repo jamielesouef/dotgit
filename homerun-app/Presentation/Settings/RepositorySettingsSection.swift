@@ -9,6 +9,7 @@ struct RepositorySettingsSection: View {
 
     @State private var requiresSyncConfirmation = AppPreferences.default.requiresSyncConfirmation
     @State private var includesUntrackedFiles = AppPreferences.default.includesUntrackedFilesByDefault
+    @State private var asksBeforeCreatingUpstream = AppPreferences.default.asksBeforeCreatingUpstream
     @State private var wipCommitPrefix = AppPreferences.default.wipCommitPrefix
     @State private var appendsTimestamp = AppPreferences.default.appendsTimestampToWIPCommit
     @State private var sortOrder = AppPreferences.default.repositorySortOrder
@@ -24,6 +25,17 @@ struct RepositorySettingsSection: View {
             Text(
                 String(
                     localized: "Every untracked file starts ticked in the sync review. Without confirmation they are committed straight away."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Toggle(String(localized: "Ask before creating a branch on the remote"), isOn: $asksBeforeCreatingUpstream)
+
+            Text(
+                String(
+                    localized: "Every unpushed branch goes up when you sync. With this off, new branches are created on the remote without asking."
                 )
             )
             .font(.caption)
@@ -59,6 +71,12 @@ struct RepositorySettingsSection: View {
         }
         .onChange(of: includesUntrackedFiles) {
             settings.updatePreferences { $0.includesUntrackedFilesByDefault = includesUntrackedFiles }
+        }
+        .onChange(of: settings.preferences.asksBeforeCreatingUpstream, initial: true) {
+            asksBeforeCreatingUpstream = settings.preferences.asksBeforeCreatingUpstream
+        }
+        .onChange(of: asksBeforeCreatingUpstream) {
+            settings.updatePreferences { $0.asksBeforeCreatingUpstream = asksBeforeCreatingUpstream }
         }
         .onChange(of: settings.preferences.wipCommitPrefix, initial: true) {
             wipCommitPrefix = settings.preferences.wipCommitPrefix

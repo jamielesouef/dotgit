@@ -11,6 +11,7 @@ struct SyncPlanStep: Equatable, Identifiable {
     let outstandingBranches: [GitBranchRef]
     let submoduleChanges: [GitSubmoduleChange]
     var worktreeName: String?
+    var branchesToPush: [GitBranchRef] = []
 
     var id: String {
         identifier
@@ -34,5 +35,15 @@ struct SyncPlanStep: Equatable, Identifiable {
 
     var isActionable: Bool {
         action.isActionable
+    }
+
+    var newUpstreamBranches: [String] {
+        let others = branchesToPush.filter(\.isLocalOnly).map(\.name)
+
+        guard case .commitAndPush(_, setsUpstream: true) = action, let branch else {
+            return others
+        }
+
+        return [branch] + others
     }
 }

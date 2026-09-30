@@ -10,6 +10,7 @@ enum SyncFailure: Error, Equatable {
     case detachedHead
     case notClonedLocally
     case accountAccessDenied(String)
+    case branchesNotPushed([String])
     case git(String)
 
     var message: String {
@@ -34,6 +35,10 @@ enum SyncFailure: Error, Equatable {
             String(localized: "This repository is not cloned on this Mac.")
         case let .accountAccessDenied(account):
             String(localized: "The account \(account) cannot reach this repository.")
+        case let .branchesNotPushed(branches):
+            String(
+                localized: "The current branch was pushed, but these branches were not: \(branches.joined(separator: ", "))"
+            )
         case let .git(detail):
             detail
         }

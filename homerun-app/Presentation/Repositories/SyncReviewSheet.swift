@@ -16,6 +16,7 @@ struct SyncReviewSheet: View {
     // MARK: - State
 
     @State private var requiresSyncConfirmation = AppPreferences.default.requiresSyncConfirmation
+    @State private var isConfirmingUpstreams = false
 
     // MARK: - View
 
@@ -34,6 +35,40 @@ struct SyncReviewSheet: View {
         }
         .onChange(of: requiresSyncConfirmation) {
             settings.updatePreferences { $0.requiresSyncConfirmation = requiresSyncConfirmation }
+        }
+        // A task rather than `onChange(initial:)`, so the dialog waits for the sheet
+        // to appear when confirmation is off and the review opens straight into it.
+        .task(id: sync.phase) {
+            isConfirmingUpstreams = sync.upstreamConfirmationPlan != nil
+        }
+        .confirmationDialog(
+            String(localized: "Create these branches on the remote?"),
+            isPresented: $isConfirmingUpstreams
+        ) {
+            upstreamActions
+        } message: {
+            Text((sync.upstreamConfirmationPlan?.newUpstreamBranches ?? []).joined(separator: "\n"))
+        }
+    }
+
+    // MARK: - Upstream confirmation
+
+    @ViewBuilder
+    private var upstreamActions: some View {
+        Button(String(localized: "Create and Push")) {
+            Task {
+                await sync.confirmUpstreams(creates: true)
+            }
+        }
+
+        Button(String(localized: "Push Without Creating")) {
+            Task {
+                await sync.confirmUpstreams(creates: false)
+            }
+        }
+
+        Button(String(localized: "Cancel"), role: .cancel) {
+            sync.cancelUpstreamConfirmation()
         }
     }
 
@@ -96,6 +131,12 @@ struct SyncReviewSheet: View {
             .keyboardShortcut(.cancelAction)
 
             Button(String(localized: "Sync")) {
+                // If the upstream dialog was dismissed without an answer, show it again.
+                guard sync.upstreamConfirmationPlan == nil else {
+                    isConfirmingUpstreams = true
+                    return
+                }
+
                 Task {
                     await sync.run()
                 }
