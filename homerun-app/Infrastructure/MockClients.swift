@@ -103,6 +103,12 @@
         func beginInteractiveSignIn() async throws(GitHubCLIError) {}
     }
 
+    struct MockSSHHostResolver: SSHHostResolving {
+        func hostName(forAlias alias: String) async -> String? {
+            alias
+        }
+    }
+
     struct MockRepositoryDiscovery: RepositoryDiscovering {
         var results: [DiscoveredRepository] = []
 

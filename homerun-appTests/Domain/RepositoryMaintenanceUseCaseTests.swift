@@ -43,6 +43,7 @@ struct RepositoryMaintenanceUseCaseTests {
 
         let merged = RepositoryMaintenanceUseCase.merged(
             existing: existing,
+            identifier: existing.identifier,
             discovered: DiscoveredRepository(url: URL(filePath: "/dev/app")),
             remoteURL: "git@github.com:acme/app.git",
             addedDate: .distantFuture
@@ -53,16 +54,18 @@ struct RepositoryMaintenanceUseCaseTests {
         #expect(merged.name == "app")
     }
 
-    @Test("creates a new entry keyed on the remote when nothing is tracked yet")
+    @Test("creates a new entry under the given identifier, keeping the remote as written")
     func createsNewEntry() {
         let merged = RepositoryMaintenanceUseCase.merged(
             existing: nil,
+            identifier: "remote:github.com/acme/app",
             discovered: DiscoveredRepository(url: URL(filePath: "/dev/app")),
-            remoteURL: "git@github.com:acme/app.git",
+            remoteURL: "git@github-work:acme/app.git",
             addedDate: .distantFuture
         )
 
         #expect(merged.identifier == "remote:github.com/acme/app")
+        #expect(merged.remoteURL == "git@github-work:acme/app.git")
         #expect(merged.preferredRelativePath == "app")
     }
 }

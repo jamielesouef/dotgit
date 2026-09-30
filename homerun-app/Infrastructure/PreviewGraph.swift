@@ -86,6 +86,7 @@
                 gitClient: gitClient,
                 discovery: MockRepositoryDiscovery(),
                 readinessChecker: MockReadinessChecker(issues: [.untrackedFiles(["Notes.md"])]),
+                sshHostResolver: MockSSHHostResolver(),
                 fileManager: .default,
                 clock: clock,
                 settings: settings

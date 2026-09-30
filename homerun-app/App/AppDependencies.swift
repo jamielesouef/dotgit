@@ -87,6 +87,10 @@ enum AppDependencies {
             gitClient: core.gitClient,
             discovery: FileSystemRepositoryDiscovery(fileManager: core.fileManager),
             readinessChecker: GitReadinessChecker(gitClient: core.gitClient, fileManager: core.fileManager),
+            sshHostResolver: ProcessSSHHostResolver(
+                commandRunner: core.commandRunner,
+                sshPath: core.resolver.resolve("ssh", preferring: nil) ?? "/usr/bin/ssh"
+            ),
             fileManager: core.fileManager,
             clock: core.clock,
             settings: core.settings

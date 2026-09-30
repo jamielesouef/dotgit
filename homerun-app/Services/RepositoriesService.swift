@@ -69,6 +69,7 @@ final class RepositoriesService: SingleFlightRefreshing {
     private let gitClient: any GitClienting
     private let discovery: any RepositoryDiscovering
     private let readinessChecker: any ReadinessChecking
+    private let sshHostResolver: any SSHHostResolving
     private let reader: TrackedRepositoryReader
     private let fileManager: FileManager
     private let clock: any Clocking
@@ -87,6 +88,7 @@ final class RepositoriesService: SingleFlightRefreshing {
         gitClient: any GitClienting,
         discovery: any RepositoryDiscovering,
         readinessChecker: any ReadinessChecking,
+        sshHostResolver: any SSHHostResolving,
         fileManager: FileManager,
         clock: any Clocking,
         settings: SettingsService
@@ -95,6 +97,7 @@ final class RepositoriesService: SingleFlightRefreshing {
         self.gitClient = gitClient
         self.discovery = discovery
         self.readinessChecker = readinessChecker
+        self.sshHostResolver = sshHostResolver
         self.fileManager = fileManager
         reader = TrackedRepositoryReader(gitClient: gitClient, fileManager: fileManager)
         self.clock = clock
@@ -182,9 +185,10 @@ final class RepositoriesService: SingleFlightRefreshing {
 
         for repository in RepositoryMaintenanceUseCase.deduplicated(discovered) {
             let remoteURL = try? await gitClient.remoteURL(at: repository.url)
-            let identifier = WorkspaceIdentifier.make(remoteURL: remoteURL, folderName: repository.name)
+            let identifier = await identifier(remoteURL: remoteURL, folderName: repository.name)
             let merged = RepositoryMaintenanceUseCase.merged(
                 existing: existing.first { $0.identifier == identifier },
+                identifier: identifier,
                 discovered: repository,
                 remoteURL: remoteURL,
                 addedDate: clock.now()
@@ -480,6 +484,19 @@ private extension RepositoriesService {
 
             repositories[index] = loaded
         }
+    }
+
+    /// Keyed on the host an SSH alias resolves to, so switching a remote between
+    /// `github-work`, `github.com` and HTTPS does not track the same repository twice.
+    func identifier(remoteURL: String?, folderName: String) async -> String {
+        guard let alias = WorkspaceIdentifier.sshHost(in: remoteURL) else {
+            return WorkspaceIdentifier.make(remoteURL: remoteURL, folderName: folderName)
+        }
+
+        let hostName = await sshHostResolver.hostName(forAlias: alias)
+        let resolved = WorkspaceIdentifier.remote(remoteURL, resolvingSSHHostTo: hostName)
+
+        return WorkspaceIdentifier.make(remoteURL: resolved, folderName: folderName)
     }
 
     func tracked(_ repository: WorkspaceRepository, path: String?) async -> TrackedRepository {

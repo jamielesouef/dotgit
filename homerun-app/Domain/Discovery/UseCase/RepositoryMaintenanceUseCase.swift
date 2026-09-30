@@ -30,12 +30,11 @@ enum RepositoryMaintenanceUseCase {
 
     static func merged(
         existing: WorkspaceRepository?,
+        identifier: String,
         discovered: DiscoveredRepository,
         remoteURL: String?,
         addedDate: Date
     ) -> WorkspaceRepository {
-        let identifier = WorkspaceIdentifier.make(remoteURL: remoteURL, folderName: discovered.name)
-
         guard var repository = existing else {
             return WorkspaceRepository(
                 identifier: identifier,
