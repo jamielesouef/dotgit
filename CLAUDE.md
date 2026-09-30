@@ -105,6 +105,10 @@ These cost real time. Do not reintroduce them.
   `store { () throws(PersistenceError) in ... }`.
 - **`accessibilityReduceMotion` is read-only** in `EnvironmentValues`, so that
   branch cannot be exercised in a `#Preview`.
+- **Never use SwiftData's default store location.** Unsandboxed, it is the shared
+  `~/Library/Application Support/default.store`, which other processes (e.g.
+  `icloudmailagent`) migrate to their own model — silently wiping the workspace.
+  `ModelContainerFactory.storeURL` puts it under the bundle identifier.
 - Adding a non-optional field to `WorkspaceManifestEntry` breaks decoding of every
   manifest written before it. New manifest fields are optional and merge as
   `newValue ?? existing`.
