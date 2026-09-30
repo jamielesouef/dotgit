@@ -11,6 +11,7 @@ final class ServiceHarness {
     let gitHubClient = StubGitHubCLIClient()
     let discovery = StubRepositoryDiscovery()
     let readinessChecker = StubReadinessChecker()
+    let sshHostResolver = StubSSHHostResolver()
     let syncEngine = StubSyncEngine()
     let manifestStore = StubWorkspaceManifestStore()
     let runtimeProvider = StubSimulatorRuntimeProvider()
@@ -37,6 +38,7 @@ final class ServiceHarness {
             gitClient: gitClient,
             discovery: discovery,
             readinessChecker: readinessChecker,
+            sshHostResolver: sshHostResolver,
             fileManager: .default,
             clock: clock,
             settings: settings

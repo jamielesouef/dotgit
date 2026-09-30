@@ -19,6 +19,7 @@ struct RepositoriesServiceTests {
             gitClient: harness.gitClient,
             discovery: harness.discovery,
             readinessChecker: harness.readinessChecker,
+            sshHostResolver: harness.sshHostResolver,
             fileManager: .default,
             clock: harness.clock,
             settings: settings
@@ -79,6 +80,24 @@ struct RepositoriesServiceTests {
         #expect(outcome == .added)
         #expect(harness.repositories.folderAwaitingScanDecision == nil)
         #expect(harness.sharedStore.repositories.count == 1)
+    }
+
+    @Test("keys a repository on the host its SSH alias resolves to, keeping the remote as written")
+    @MainActor
+    func resolvesSSHAlias() async {
+        let harness = ServiceHarness()
+        let directory = harness.makeDirectory("app")
+        await harness.gitClient.setSnapshot(
+            RepositoryFixtures.snapshot(remoteURL: "git@github-work:acme/app.git"),
+            at: directory
+        )
+        await harness.sshHostResolver.setHostName("github.com", forAlias: "github-work")
+
+        await harness.repositories.addRepository(at: directory)
+
+        let stored = harness.sharedStore.repositories.first
+        #expect(stored?.identifier == "remote:github.com/acme/app")
+        #expect(stored?.remoteURL == "git@github-work:acme/app.git")
     }
 
     @Test("queues each folder it could not add and offers them one at a time")

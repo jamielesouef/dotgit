@@ -10,6 +10,7 @@ enum RepositoryFixtures {
         untracked: [String] = [],
         branches: [GitBranchRef] = [],
         remote: String? = "origin",
+        remoteURL: String = "git@github.com:acme/app.git",
         upstream: String? = "origin/main",
         submodules: [GitSubmoduleChange] = [],
         headCommit: String? = "abc1234"
@@ -18,7 +19,7 @@ enum RepositoryFixtures {
             currentBranch: branch,
             headCommit: headCommit,
             defaultRemoteName: remote,
-            remoteURL: remote == nil ? nil : "git@github.com:acme/app.git",
+            remoteURL: remote == nil ? nil : remoteURL,
             upstreamBranch: upstream,
             aheadCount: ahead,
             behindCount: behind,
