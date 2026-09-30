@@ -7,6 +7,7 @@ final class SharedPreferencesRecord {
     var showsCleanRepositories: Bool = true
     var requiresSyncConfirmation: Bool = true
     var includesUntrackedFilesByDefault: Bool = false
+    var asksBeforeCreatingUpstream: Bool = true
     var wipCommitPrefix: String = AppPreferences.fallbackWIPCommitPrefix
     var appendsTimestampToWIPCommit: Bool = true
     var repositorySortOrderRaw: String = RepositorySortOrder.name.rawValue
@@ -27,6 +28,7 @@ final class SharedPreferencesRecord {
             showsCleanRepositories: showsCleanRepositories,
             requiresSyncConfirmation: requiresSyncConfirmation,
             includesUntrackedFilesByDefault: includesUntrackedFilesByDefault,
+            asksBeforeCreatingUpstream: asksBeforeCreatingUpstream,
             wipCommitPrefix: wipCommitPrefix,
             appendsTimestampToWIPCommit: appendsTimestampToWIPCommit,
             repositorySortOrder: RepositorySortOrder(rawValue: repositorySortOrderRaw) ?? .name,
@@ -44,6 +46,7 @@ final class SharedPreferencesRecord {
         showsCleanRepositories = preferences.showsCleanRepositories
         requiresSyncConfirmation = preferences.requiresSyncConfirmation
         includesUntrackedFilesByDefault = preferences.includesUntrackedFilesByDefault
+        asksBeforeCreatingUpstream = preferences.asksBeforeCreatingUpstream
         wipCommitPrefix = preferences.wipCommitPrefix
         appendsTimestampToWIPCommit = preferences.appendsTimestampToWIPCommit
         repositorySortOrderRaw = preferences.repositorySortOrder.rawValue

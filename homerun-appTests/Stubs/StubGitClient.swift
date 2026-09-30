@@ -14,6 +14,7 @@ actor StubGitClient: GitClienting {
     var stageError: GitError?
     var commitError: GitError?
     var pushFailures: [GitError] = []
+    var pushFailuresByBranch: [String: GitError] = [:]
     var fetchError: GitError?
     var fastForwardError: GitError?
     var cloneError: GitError?
@@ -75,6 +76,10 @@ actor StubGitClient: GitClienting {
 
     func setPushFailures(_ failures: [GitError]) {
         pushFailures = failures
+    }
+
+    func setPushFailure(_ error: GitError, forBranch branch: String) {
+        pushFailuresByBranch[branch] = error
     }
 
     func setCommitError(_ error: GitError?) {
@@ -194,6 +199,10 @@ actor StubGitClient: GitClienting {
     func push(branch: String, remote: String, setUpstream: Bool, at url: URL) async throws(GitError) {
         calls.append("push")
         pushes.append((branch, remote, setUpstream))
+
+        if let failure = pushFailuresByBranch[branch] {
+            throw failure
+        }
 
         guard pushFailures.isEmpty == false else {
             return

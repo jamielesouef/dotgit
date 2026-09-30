@@ -14,4 +14,5 @@ struct RepositorySyncRequest: Equatable {
     let preferredAccount: String?
     let checksAccountAccess: Bool
     let fallbackEnabled: Bool
+    var additionalBranches: [GitBranchRef] = []
 }

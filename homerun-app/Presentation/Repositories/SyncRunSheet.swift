@@ -28,7 +28,8 @@ struct SyncRunSheet: View {
     private var content: some View {
         switch sync.phase {
         case .idle,
-             .reviewing:
+             .reviewing,
+             .confirmingUpstreams:
             ProgressView()
         case let .running(progress):
             running(progress)

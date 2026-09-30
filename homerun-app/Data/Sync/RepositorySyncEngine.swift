@@ -22,6 +22,20 @@ struct RepositorySyncEngine: RepositorySyncPerforming {
     // MARK: - RepositorySyncPerforming
 
     func sync(_ request: RepositorySyncRequest) async -> RepositorySyncReport {
+        let report = await syncCurrentBranch(request)
+
+        return await pushAdditionalBranches(request, after: report)
+    }
+
+    // MARK: - Helpers
+
+    private enum CommitOutcome {
+        case committed
+        case nothingStaged
+        case failed(SyncFailure)
+    }
+
+    private func syncCurrentBranch(_ request: RepositorySyncRequest) async -> RepositorySyncReport {
         if let denial = await accessDenial(for: request) {
             return report(request, result: .failed(denial), committed: false)
         }
@@ -40,12 +54,79 @@ struct RepositorySyncEngine: RepositorySyncPerforming {
         }
     }
 
-    // MARK: - Helpers
+    /// Branches that are not checked out go up as they are, once the current one is
+    /// safely pushed. Their failures skip `handle(_:)`: the protected-branch fallback
+    /// checks out a new branch, which is wrong for a branch nobody is on.
+    private func pushAdditionalBranches(
+        _ request: RepositorySyncRequest,
+        after report: RepositorySyncReport
+    ) async -> RepositorySyncReport {
+        guard case .succeeded = report.result, request.additionalBranches.isEmpty == false else {
+            return report
+        }
 
-    private enum CommitOutcome {
-        case committed
-        case nothingStaged
-        case failed(SyncFailure)
+        var failed: [String] = []
+
+        for branch in request.additionalBranches {
+            guard Task.isCancelled == false else {
+                failed.append(branch.name)
+                continue
+            }
+
+            if await push(branch, request: request) == false {
+                failed.append(branch.name)
+            }
+        }
+
+        guard failed.isEmpty == false else {
+            return report
+        }
+
+        return RepositorySyncReport(
+            identifier: report.identifier,
+            branch: report.branch,
+            result: .failed(.branchesNotPushed(failed)),
+            fallback: report.fallback,
+            committed: report.committed
+        )
+    }
+
+    private func push(_ branch: GitBranchRef, request: RepositorySyncRequest) async -> Bool {
+        do {
+            try await gitClient.push(
+                branch: branch.name,
+                remote: request.remote,
+                setUpstream: branch.isLocalOnly,
+                at: request.directory
+            )
+        } catch {
+            AppLog.error("Could not push \(branch.name) on \(request.identifier): \(String(describing: error))")
+
+            guard case .authenticationFailed = error, request.fallbackEnabled else {
+                return false
+            }
+
+            // The fallback restores the original account after each retry, so every
+            // branch that needed it has to go through it again.
+            let context = PushAttemptContext(
+                directory: request.directory,
+                branch: branch.name,
+                remote: request.remote,
+                remoteURL: request.remoteURL,
+                setsUpstream: branch.isLocalOnly,
+                preferredAccount: request.preferredAccount
+            )
+
+            switch await pushFallback.retryPush(context) {
+            case .succeeded:
+                return true
+            case .notApplicable,
+                 .exhausted:
+                return false
+            }
+        }
+
+        return true
     }
 
     private func accessDenial(for request: RepositorySyncRequest) async -> SyncFailure? {

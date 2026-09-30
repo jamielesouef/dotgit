@@ -8,6 +8,7 @@ final class SyncService {
     enum Phase: Equatable {
         case idle
         case reviewing(SyncPlan)
+        case confirmingUpstreams(SyncPlan)
         case running(SyncProgress)
         case finished(SyncSummary)
     }
@@ -16,7 +17,19 @@ final class SyncService {
     private(set) var untrackedSelections: [String: Set<String>] = [:]
 
     var reviewPlan: SyncPlan? {
-        guard case let .reviewing(plan) = phase else {
+        switch phase {
+        case let .reviewing(plan),
+             let .confirmingUpstreams(plan):
+            plan
+        case .idle,
+             .running,
+             .finished:
+            nil
+        }
+    }
+
+    var upstreamConfirmationPlan: SyncPlan? {
+        guard case let .confirmingUpstreams(plan) = phase else {
             return nil
         }
 
@@ -29,7 +42,8 @@ final class SyncService {
              .finished:
             true
         case .idle,
-             .reviewing:
+             .reviewing,
+             .confirmingUpstreams:
             false
         }
     }
@@ -126,11 +140,29 @@ final class SyncService {
     }
 
     func cancelReview() {
-        guard case .reviewing = phase else {
+        guard reviewPlan != nil else {
             return
         }
 
         phase = .idle
+    }
+
+    func cancelUpstreamConfirmation() {
+        guard let plan = upstreamConfirmationPlan else {
+            return
+        }
+
+        phase = .reviewing(plan)
+    }
+
+    /// Declining still pushes everything that already has an upstream. Branches that
+    /// only exist on this Mac stay there, and are reported as not pushed.
+    func confirmUpstreams(creates: Bool) async {
+        guard let plan = upstreamConfirmationPlan else {
+            return
+        }
+
+        await start(creates ? plan : replanned(plan, createsUpstreams: false))
     }
 
     func dismissSummary() {
@@ -152,6 +184,19 @@ final class SyncService {
             return
         }
 
+        // The gate lives here rather than in the review sheet, so it still fires
+        // when confirmation is off and `review` runs straight through.
+        guard settings.preferences.asksBeforeCreatingUpstream == false || plan.newUpstreamBranches.isEmpty else {
+            phase = .confirmingUpstreams(plan)
+            return
+        }
+
+        await start(plan)
+    }
+
+    // MARK: - Helpers
+
+    private func start(_ plan: SyncPlan) async {
         runTask?.cancel()
         let task = Task { [weak self] in
             guard let self else {
@@ -164,18 +209,24 @@ final class SyncService {
         await task.value
     }
 
-    // MARK: - Helpers
-
     private func refreshReview() {
         guard case let .reviewing(plan) = phase else {
             return
         }
 
+        phase = .reviewing(replanned(plan, createsUpstreams: true))
+    }
+
+    private func replanned(_ plan: SyncPlan, createsUpstreams: Bool) -> SyncPlan {
         let selected = repositories.allCheckouts.filter { repository in
             plan.steps.contains { $0.identifier == repository.id }
         }
 
-        phase = .reviewing(SyncPlanUseCase.plan(for: selected, untrackedSelections: untrackedSelections))
+        return SyncPlanUseCase.plan(
+            for: selected,
+            untrackedSelections: untrackedSelections,
+            createsUpstreams: createsUpstreams
+        )
     }
 
     private func execute(_ plan: SyncPlan) async {
@@ -267,7 +318,8 @@ final class SyncService {
             ),
             preferredAccount: repository.shared.preferredGitHubAccount,
             checksAccountAccess: settings.preferences.accountAccessChecksEnabled,
-            fallbackEnabled: settings.preferences.accountFallbackEnabled
+            fallbackEnabled: settings.preferences.accountFallbackEnabled,
+            additionalBranches: step.branchesToPush
         )
     }
 }

@@ -15,7 +15,8 @@ struct RepositorySyncEngineTests {
         remoteURL: String? = "https://github.com/acme/app.git",
         checksAccess: Bool = false,
         fallbackEnabled: Bool = true,
-        preferredAccount: String? = nil
+        preferredAccount: String? = nil,
+        additionalBranches: [GitBranchRef] = []
     ) -> RepositorySyncRequest {
         RepositorySyncRequest(
             identifier: "app",
@@ -30,7 +31,8 @@ struct RepositorySyncEngineTests {
             commitMessage: "WIP 2026-09-23 10:00:00",
             preferredAccount: preferredAccount,
             checksAccountAccess: checksAccess,
-            fallbackEnabled: fallbackEnabled
+            fallbackEnabled: fallbackEnabled,
+            additionalBranches: additionalBranches
         )
     }
 
@@ -96,6 +98,61 @@ struct RepositorySyncEngineTests {
         _ = await makeEngine(git: git).sync(request(willCommit: false))
 
         #expect(await git.calls == ["push"])
+    }
+
+    // MARK: - Other branches
+
+    private let otherBranches = [
+        GitBranchRef(name: "spike", upstream: nil, aheadCount: 0, behindCount: 0),
+        GitBranchRef(name: "feature/ahead", upstream: "origin/feature/ahead", aheadCount: 2, behindCount: 0)
+    ]
+
+    @Test("pushes the other branches after the current one, creating an upstream only where there is none")
+    func pushesOtherBranches() async {
+        let git = StubGitClient()
+
+        let report = await makeEngine(git: git).sync(request(additionalBranches: otherBranches))
+
+        let pushes = await git.pushes
+        #expect(pushes.map(\.branch) == ["feature/login", "spike", "feature/ahead"])
+        #expect(pushes.map(\.setUpstream) == [false, true, false])
+        #expect(report.result == .succeeded(commit: "head0001", branch: "feature/login"))
+    }
+
+    @Test("reports the other branches that did not push, without branching off them")
+    func reportsOtherBranchFailures() async {
+        let git = StubGitClient()
+        await git.setPushFailure(.branchProtected("GH006"), forBranch: "spike")
+
+        let report = await makeEngine(git: git).sync(request(additionalBranches: otherBranches))
+
+        #expect(report.result == .failed(.branchesNotPushed(["spike"])))
+        #expect(await git.calls.contains("createBranch") == false)
+        #expect(await git.pushes.map(\.branch) == ["feature/login", "spike", "feature/ahead"])
+    }
+
+    @Test("retries another branch through the account fallback when authentication fails")
+    func retriesOtherBranchThroughFallback() async {
+        let git = StubGitClient()
+        await git.setPushFailure(.authenticationFailed("denied"), forBranch: "spike")
+        let fallback = StubPushFallback(result: .succeeded(account: "acme-bot", attempts: []))
+
+        let report = await makeEngine(git: git, fallback: fallback)
+            .sync(request(additionalBranches: otherBranches))
+
+        #expect(report.result == .succeeded(commit: "head0001", branch: "feature/login"))
+        #expect(await fallback.contexts.map(\.branch) == ["spike"])
+        #expect(await fallback.contexts.first?.setsUpstream == true)
+    }
+
+    @Test("leaves the other branches alone when the current branch failed to push")
+    func skipsOtherBranchesAfterFailure() async {
+        let git = StubGitClient()
+        await git.setPushFailures([.diverged])
+
+        _ = await makeEngine(git: git).sync(request(additionalBranches: otherBranches))
+
+        #expect(await git.pushes.map(\.branch) == ["feature/login"])
     }
 
     // MARK: - Failures

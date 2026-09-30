@@ -49,6 +49,95 @@ struct SyncServiceTests {
         ])))
     }
 
+    // MARK: - New upstreams
+
+    private func addRepositoryWithLocalOnlyBranch(to harness: ServiceHarness) async {
+        await harness.addRepository(
+            "a",
+            name: "app",
+            snapshot: RepositoryFixtures.snapshot(
+                branch: "feature/login",
+                ahead: 1,
+                branches: [GitBranchRef(name: "spike", upstream: nil, aheadCount: 0, behindCount: 0)]
+            )
+        )
+        await harness.repositories.start()
+    }
+
+    @Test("asks before creating a branch on the remote")
+    @MainActor
+    func asksBeforeCreatingUpstream() async {
+        let harness = ServiceHarness()
+        await addRepositoryWithLocalOnlyBranch(to: harness)
+        let service = harness.makeSync()
+
+        await service.review(identifiers: nil)
+        await service.run()
+
+        #expect(service.upstreamConfirmationPlan?.newUpstreamBranches == ["app: spike"])
+        #expect(service.reviewPlan != nil)
+        #expect(await harness.syncEngine.requests.isEmpty)
+    }
+
+    @Test("asks even when sync confirmation is switched off")
+    @MainActor
+    func asksWithoutSyncConfirmation() async {
+        let harness = ServiceHarness()
+        await addRepositoryWithLocalOnlyBranch(to: harness)
+        harness.settings.updatePreferences { $0.requiresSyncConfirmation = false }
+        let service = harness.makeSync()
+
+        await service.review(identifiers: nil)
+
+        #expect(service.upstreamConfirmationPlan != nil)
+        #expect(await harness.syncEngine.requests.isEmpty)
+    }
+
+    @Test("creates the branch without asking when the prompt is switched off")
+    @MainActor
+    func createsUpstreamWithoutAsking() async {
+        let harness = ServiceHarness()
+        await addRepositoryWithLocalOnlyBranch(to: harness)
+        harness.settings.updatePreferences { $0.asksBeforeCreatingUpstream = false }
+        let service = harness.makeSync()
+
+        await service.review(identifiers: nil)
+        await service.run()
+
+        #expect(await harness.syncEngine.requests.first?.additionalBranches.map(\.name) == ["spike"])
+    }
+
+    @Test("pushes the branches that already have an upstream when creating one is declined")
+    @MainActor
+    func declinesUpstream() async {
+        let harness = ServiceHarness()
+        await addRepositoryWithLocalOnlyBranch(to: harness)
+        let service = harness.makeSync()
+
+        await service.review(identifiers: nil)
+        await service.run()
+        await service.confirmUpstreams(creates: false)
+
+        let requests = await harness.syncEngine.requests
+        #expect(requests.map(\.branch) == ["feature/login"])
+        #expect(requests.first?.additionalBranches.isEmpty == true)
+    }
+
+    @Test("goes back to the review when the prompt is cancelled")
+    @MainActor
+    func cancelsUpstreamPrompt() async {
+        let harness = ServiceHarness()
+        await addRepositoryWithLocalOnlyBranch(to: harness)
+        let service = harness.makeSync()
+
+        await service.review(identifiers: nil)
+        await service.run()
+        service.cancelUpstreamConfirmation()
+
+        #expect(service.upstreamConfirmationPlan == nil)
+        #expect(service.reviewPlan != nil)
+    }
+
     @Test("syncs only the repositories that were selected")
     @MainActor
     func syncsSelectionOnly() async {

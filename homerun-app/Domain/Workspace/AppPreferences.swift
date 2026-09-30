@@ -5,6 +5,7 @@ struct AppPreferences: Equatable, Codable {
     var showsCleanRepositories: Bool
     var requiresSyncConfirmation: Bool
     var includesUntrackedFilesByDefault: Bool
+    var asksBeforeCreatingUpstream: Bool
     var wipCommitPrefix: String
     var appendsTimestampToWIPCommit: Bool
     var repositorySortOrder: RepositorySortOrder
@@ -32,6 +33,7 @@ struct AppPreferences: Equatable, Codable {
         showsCleanRepositories: true,
         requiresSyncConfirmation: true,
         includesUntrackedFilesByDefault: false,
+        asksBeforeCreatingUpstream: true,
         wipCommitPrefix: fallbackWIPCommitPrefix,
         appendsTimestampToWIPCommit: true,
         repositorySortOrder: .name,
