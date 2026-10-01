@@ -227,7 +227,7 @@ custom_rules:
     # Tests hold and release work with the StubGitClient continuation gate instead.
     no_sleep_in_tests:
         name: "Sleep in a test"
-        included: '.*/homerun-appTests/.*\.swift'
+        included: '.*/dotgitTests/.*\.swift'
         regex: '\b(Task\.sleep|sleep|usleep)\s*\('
         message: "No sleep or polling. Use holdSnapshots / waitUntilSnapshotRequested / releaseSnapshots"
         severity: error
