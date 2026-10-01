@@ -7,6 +7,32 @@ Two independent parts sharing one idea — never leave work stranded on one Mac.
 
 They share no code. A change to one does not imply a change to the other.
 
+# Agents
+
+## Claude System Instructions
+- Always be highly concise.
+- Provide direct answers with minimal explanation.
+- Skip conversational filler and pleasantries.
+- Don't show code just what has changed.
+
+## Delegation
+
+Delegate to keep raw output out of this context. Never delegate reading a file you are about to edit — read it yourself.
+
+| When | Agent |
+|---|---|
+| Need locations of code before editing | code-scout |
+| Question about how the code behaves | code-inquiry |
+| About to change a symbol used outside its file | impact-analyser (before editing) |
+| Starting new code that resembles existing code | precedent-finder |
+| Running build/test/lint commands | command-runner, then build-log-triage on the logs |
+| Any API/SDK/tool detail that may have changed since training | doc-researcher |
+| "Why is this like this" / history questions | git-historian |
+| Checking a change against acceptance criteria | acceptance-verifier |
+| When commit, creating a PR, pushing | git-ops |
+
+Act on agent JSON directly; don't re-run their searches to double-check unless the result is `partial` or `uncertain`.
+
 ## Commands
 
 ```sh
