@@ -1,11 +1,6 @@
-# homerun
+# dotgit
 
-Two independent parts sharing one idea — never leave work stranded on one Mac.
-
-- `cli/` — the `homerun` command line tool. Swift package, macOS 13+, ArgumentParser.
-- `desktop/` — the macOS app. Xcode project, Swift 6, SwiftUI, SwiftData.
-
-They share no code. A change to one does not imply a change to the other.
+A macOS app that makes sure work is never stranded on one Mac. Xcode project at the repo root, Swift 6, SwiftUI, SwiftData.
 
 # Agents
 
@@ -36,21 +31,13 @@ Act on agent JSON directly; don't re-run their searches to double-check unless t
 ## Commands
 
 ```sh
-# CLI — must run from cli/, there is no Package.swift at the repo root
-cd cli && swift build && swift test
-
-# App
-cd desktop
-xcodebuild -project homerun-app.xcodeproj -scheme homerun-app -destination 'platform=macOS' build
-xcodebuild -project homerun-app.xcodeproj -scheme homerun-app -destination 'platform=macOS' test
+xcodebuild -project dotgit.xcodeproj -scheme dotgit -destination 'platform=macOS' build
+xcodebuild -project dotgit.xcodeproj -scheme dotgit -destination 'platform=macOS' test
 ```
-
-Both GitHub workflows currently run `swift` from the repo root and therefore fail.
-They need `working-directory: cli`. Not yet fixed.
 
 ## Architecture
 
-**Read `docs/templates/README.md` before touching `desktop/`.** It is the contract the
+**Read `docs/templates/README.md` before touching `dotgit/`.** It is the contract the
 code follows, not a suggestion. The short version:
 
 - Layers run Domain ← Data ← Services ← Presentation. Domain imports no SwiftUI.
@@ -86,7 +73,7 @@ workspace root, menu bar preference — goes in `UserDefaults` so it never trave
 - `ENABLE_APP_SANDBOX = NO`, deliberately. The app shells out to `git`, `gh`,
   `osascript` and `xcrun` and reads repositories anywhere on disk.
 - The Xcode project uses **file-system-synchronized groups**. New files under
-  `desktop/homerun-app/` join the target automatically — never edit `project.pbxproj`
+  `dotgit/` join the target automatically — never edit `project.pbxproj`
   to add a file.
 
 ## Testing
@@ -94,7 +81,7 @@ workspace root, menu bar preference — goes in `UserDefaults` so it never trave
 Swift Testing only. `@Suite("Name", .tags(...))`, `@Test("reads as a sentence")`.
 No XCTest. **No UI tests** — this is a project rule, not an oversight.
 
-- Tags come from one catalogue in `homerun-appTests/Support/Tags.swift`.
+- Tags come from one catalogue in `dotgitTests/Support/Tags.swift`.
 - `Stub*` lives in the test target, `Mock*` in the app target under `#if DEBUG`.
 - No `sleep`, no polling. To assert on something mid-flight, use the continuation
   gate on `StubGitClient` (`holdSnapshots` / `waitUntilSnapshotRequested` /
@@ -156,18 +143,17 @@ Commit messages are prose that explain **why**, not bullet lists of what changed
 Lead with the problem, then the fix, then anything surprising. Match the existing
 log.
 
-Pushing needs care: the repo is `jamielesouef/homerun` but the active `gh` account
-on this machine is often `j-lesouef`, and the remote is HTTPS so git takes the
-active account's token — giving a 403. Switch, push, then switch back:
+The remote is `git@github.per:jamielesouef/dotgit.git`. `github.per` is an SSH alias in `~/.ssh/config` that pins the `jamielesouef` key, so `git push` works whichever `gh` account is active.
+
+`gh` commands that write to the repo (PRs, renames) use the active `gh` account, which on this machine is often `j-lesouef` and gets a 403. Switch, run, then switch back:
 
 ```sh
 gh auth switch --hostname github.com --user jamielesouef
-git push
+gh pr create ...
 gh auth switch --hostname github.com --user j-lesouef
 ```
 
-Restore the account even if the push fails. Note `status` is read-only in zsh, so
-do not use it as a variable name when capturing the exit code.
+Restore the account even if the command fails. Note `status` is read-only in zsh, so do not use it as a variable name when capturing the exit code.
 
 ## Spec
 
