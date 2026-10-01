@@ -1,11 +1,8 @@
 # Architecture — the macOS app
 
-How `desktop/homerun-app` is put together and why. The generic layer contract lives
-in [`templates/README.md`](templates/README.md); this describes what homerun
+How `dotgit/` is put together and why. The generic layer contract lives
+in [`templates/README.md`](templates/README.md); this describes what dotgit
 actually does with it.
-
-The command line tool in `cli/` is a separate program sharing no code. Nothing
-here applies to it.
 
 ## The shape
 

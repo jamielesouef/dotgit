@@ -13,9 +13,9 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Build
-        run: xcodebuild -project homerun-app.xcodeproj -scheme homerun-app -destination 'platform=macOS' build
+        run: xcodebuild -project dotgit.xcodeproj -scheme dotgit -destination 'platform=macOS' build
       - name: Run tests
-        run: xcodebuild -project homerun-app.xcodeproj -scheme homerun-app -destination 'platform=macOS' test
+        run: xcodebuild -project dotgit.xcodeproj -scheme dotgit -destination 'platform=macOS' test
 
   lint:
     runs-on: macos-26

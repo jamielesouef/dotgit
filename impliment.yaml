@@ -1,4 +1,4 @@
-app: Homerun macOS
+app: Dotgit macOS
 
 architecture:
   - Read docs/templates/README.md first and follow its architecture.
@@ -164,4 +164,4 @@ settings:
   menu_bar:
     - Show or hide the menu bar item on this Mac.
     - Choose whether the menu bar displays a count of repositories with local-only work.
-    - Choose whether closing the main window keeps homerun running in the menu bar.
+    - Choose whether closing the main window keeps dotgit running in the menu bar.
