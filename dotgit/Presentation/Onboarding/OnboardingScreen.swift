@@ -27,7 +27,7 @@ struct OnboardingScreen: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: AppSpacing.xsmall) {
-            Label(String(localized: "dotgit"), systemImage: "figure.baseball")
+            Label(String(localized: "dotgit"), systemImage: "arrow.triangle.branch")
                 .font(.largeTitle.weight(.semibold))
 
             Text(String(localized: "A quick check of the tools dotgit uses on this Mac."))
